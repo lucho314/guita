@@ -98,3 +98,27 @@ export interface BudgetWithSpending extends Budget {
   percentage: number;
   status: 'ok' | 'warning' | 'exceeded';
 }
+
+export interface EmergencyFundAnalysis {
+  monthsOfData: number;
+  averageMonthlyExpenses: number;
+  minimum: number;
+  recommended: number;
+  maximum: number;
+  hasEnoughData: boolean;
+  monthsNeeded: number;
+}
+
+export type LeakType = 'recurring' | 'spike' | 'small-frequent';
+export type LeakSeverity = 'low' | 'medium' | 'high';
+
+export interface SpendingLeak {
+  type: LeakType;
+  categoryId: string;
+  categoryLabel: string;
+  categoryIcon: string;
+  categoryColor: string;
+  monthlyAmount: number;
+  severity: LeakSeverity;
+  detail: string;
+}

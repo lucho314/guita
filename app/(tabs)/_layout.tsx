@@ -65,13 +65,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="goals"
+        name="analysis"
         options={{
-          title: 'Metas',
+          title: 'Análisis',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="flag" size={size} color={color} />
+            <MaterialIcons name="insights" size={size} color={color} />
           ),
         }}
+      />
+      <Tabs.Screen
+        name="goals"
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="explore"
