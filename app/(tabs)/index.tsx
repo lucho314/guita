@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -59,8 +60,23 @@ function TransactionRow({ transaction }: { transaction: Transaction }) {
 }
 
 export default function DashboardScreen() {
-  const { user, displayName, profile } = useAuth();
+  const { user, displayName, profile, signOut } = useAuth();
   const { transactions, monthlyTotals, weeklySpending, isLoading, refresh } = useTransactions();
+
+  function handleAvatarPress() {
+    Alert.alert(
+      displayName,
+      user?.email ?? '',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar sesión',
+          style: 'destructive',
+          onPress: signOut,
+        },
+      ],
+    );
+  }
 
   const currentMonth = formatMonth(new Date());
   const recentTransactions = transactions.slice(0, 5);
@@ -87,7 +103,9 @@ export default function DashboardScreen() {
             <Text style={styles.greeting}>Hola, {displayName} 👋</Text>
             <Text style={styles.monthLabel}>{currentMonth}</Text>
           </View>
-          <Avatar name={displayName} uri={profile?.avatar_url} size={42} />
+          <Pressable onPress={handleAvatarPress}>
+            <Avatar name={displayName} uri={profile?.avatar_url} size={42} />
+          </Pressable>
         </View>
 
         {/* Balance Card */}
