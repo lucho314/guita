@@ -1,20 +1,21 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import dayjs from 'dayjs';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  FlatList,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  type ViewToken,
 } from 'react-native';
 import { Colors } from '@/constants/theme';
 
 const ITEM_HEIGHT = 48;
 const VISIBLE_ITEMS = 5;
-const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
+const PAD = Math.floor(VISIBLE_ITEMS / 2); // 2
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -22,15 +23,9 @@ const MONTHS = [
 ];
 
 function range(start: number, end: number): number[] {
-  const arr = [];
+  const arr: number[] = [];
   for (let i = start; i <= end; i++) arr.push(i);
   return arr;
-}
-
-// Pads list so first/last items can center in the picker
-function padList<T>(items: T[]): (T | null)[] {
-  const pad = Math.floor(VISIBLE_ITEMS / 2);
-  return [...Array(pad).fill(null), ...items, ...Array(pad).fill(null)];
 }
 
 interface WheelPickerProps {
@@ -40,65 +35,56 @@ interface WheelPickerProps {
 }
 
 function WheelPicker({ items, selectedIndex, onIndexChange }: WheelPickerProps) {
-  const padded = padList(items);
-  const ref = useRef<FlatList>(null);
-  const isMounted = useRef(false);
+  const ref = useRef<ScrollView>(null);
+  const [displayIndex, setDisplayIndex] = useState(selectedIndex);
+  const isUserScrolling = useRef(false);
+  const isFirstRender = useRef(true);
 
+  // Scroll to position when selectedIndex changes from parent (e.g. day clamping)
   useEffect(() => {
-    if (isMounted.current) return;
-    isMounted.current = true;
-    // Initial scroll without animation
-    setTimeout(() => {
-      ref.current?.scrollToIndex({ index: selectedIndex, animated: false });
-    }, 0);
-  }, []);
-
-  useEffect(() => {
-    if (!isMounted.current) return;
-    ref.current?.scrollToIndex({ index: selectedIndex, animated: true });
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      setTimeout(() => {
+        ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
+      }, 50);
+      return;
+    }
+    if (isUserScrolling.current) return;
+    setDisplayIndex(selectedIndex);
+    ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: true });
   }, [selectedIndex]);
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const center = viewableItems.find((v) => v.item !== null);
-      if (center && center.index !== null) {
-        const realIndex = center.index - Math.floor(VISIBLE_ITEMS / 2);
-        if (realIndex >= 0 && realIndex < items.length) {
-          onIndexChange(realIndex);
-        }
-      }
-    },
-    [items.length, onIndexChange],
-  );
-
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 100, minimumViewTime: 0 });
+  function handleScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const y = e.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(Math.round(y / ITEM_HEIGHT), items.length - 1));
+    setDisplayIndex(index);
+    onIndexChange(index);
+    setTimeout(() => { isUserScrolling.current = false; }, 100);
+  }
 
   return (
     <View style={styles.wheel}>
-      {/* Selection highlight */}
       <View style={styles.selectionHighlight} pointerEvents="none" />
-      <FlatList
+      <ScrollView
         ref={ref}
-        data={padded}
-        keyExtractor={(_, i) => String(i)}
+        style={styles.wheelScroll}
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate="fast"
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig.current}
-        getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
-        renderItem={({ item, index }) => {
-          const realIndex = index - Math.floor(VISIBLE_ITEMS / 2);
-          const isSelected = realIndex === selectedIndex;
-          return (
-            <View style={styles.wheelItem}>
-              <Text style={[styles.wheelText, isSelected && styles.wheelTextSelected]}>
-                {item === null ? '' : item}
-              </Text>
-            </View>
-          );
-        }}
-      />
+        onScrollBeginDrag={() => { isUserScrolling.current = true; }}
+        onMomentumScrollEnd={handleScrollEnd}
+        onScrollEndDrag={handleScrollEnd}
+        contentContainerStyle={{ paddingVertical: PAD * ITEM_HEIGHT }}
+        scrollEventThrottle={16}
+      >
+        {items.map((item, index) => (
+          <View key={String(item)} style={styles.wheelItem}>
+            <Text style={[styles.wheelText, index === displayIndex && styles.wheelTextSelected]}>
+              {item}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -114,21 +100,32 @@ export function DatePickerModal({ visible, value, onConfirm, onClose }: DatePick
   const parsed = dayjs(value);
   const [year, setYear] = useState(parsed.year());
   const [month, setMonth] = useState(parsed.month()); // 0-indexed
-  const [day, setDay] = useState(parsed.date());
+  const [day, setDay] = useState(parsed.date() - 1); // 0-indexed for picker
 
   const currentYear = dayjs().year();
   const years = range(currentYear - 5, currentYear + 1);
   const daysInMonth = dayjs(`${year}-${month + 1}-01`).daysInMonth();
   const days = range(1, daysInMonth);
 
-  // Clamp day when month/year changes
+  // Clamp day index when month/year changes
   useEffect(() => {
-    if (day > daysInMonth) setDay(daysInMonth);
+    if (day >= daysInMonth) setDay(daysInMonth - 1);
   }, [daysInMonth]);
 
+  // Reset state when modal opens with a new value
+  useEffect(() => {
+    if (visible) {
+      const p = dayjs(value);
+      setYear(p.year());
+      setMonth(p.month());
+      setDay(p.date() - 1);
+    }
+  }, [visible]);
+
   function handleConfirm() {
-    const date = dayjs(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
-    onConfirm(date.format('YYYY-MM-DD'));
+    const d = day + 1;
+    const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    onConfirm(date);
   }
 
   return (
@@ -149,21 +146,25 @@ export function DatePickerModal({ visible, value, onConfirm, onClose }: DatePick
           </Pressable>
         </View>
 
-        {/* Pickers row */}
+        {/* Column labels */}
+        <View style={styles.columnLabels}>
+          <Text style={styles.columnLabel}>Día</Text>
+          <Text style={styles.columnLabel}>Mes</Text>
+          <Text style={styles.columnLabel}>Año</Text>
+        </View>
+
+        {/* Pickers */}
         <View style={styles.pickersRow}>
-          {/* Day */}
           <WheelPicker
             items={days}
-            selectedIndex={day - 1}
-            onIndexChange={(i) => setDay(i + 1)}
+            selectedIndex={day}
+            onIndexChange={setDay}
           />
-          {/* Month */}
           <WheelPicker
             items={MONTHS}
             selectedIndex={month}
             onIndexChange={setMonth}
           />
-          {/* Year */}
           <WheelPicker
             items={years}
             selectedIndex={years.indexOf(year)}
@@ -184,7 +185,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: 32,
+    paddingBottom: 36,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -220,24 +221,41 @@ const styles = StyleSheet.create({
     color: Colors.dark.accent,
     textAlign: 'right',
   },
+  columnLabels: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  columnLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.dark.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   pickersRow: {
     flexDirection: 'row',
-    height: PICKER_HEIGHT,
-    marginTop: 8,
+    height: ITEM_HEIGHT * VISIBLE_ITEMS,
   },
   wheel: {
     flex: 1,
-    height: PICKER_HEIGHT,
+    height: ITEM_HEIGHT * VISIBLE_ITEMS,
     overflow: 'hidden',
   },
   selectionHighlight: {
     position: 'absolute',
-    top: ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2),
-    left: 4,
-    right: 4,
+    top: ITEM_HEIGHT * PAD,
+    left: 6,
+    right: 6,
     height: ITEM_HEIGHT,
     backgroundColor: Colors.dark.surface2,
     borderRadius: 8,
+    zIndex: 0,
+  },
+  wheelScroll: {
     zIndex: 1,
   },
   wheelItem: {
