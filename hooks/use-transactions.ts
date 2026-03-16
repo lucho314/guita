@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useTransactionStore } from '@/store/transaction-store';
 import { useAuth } from './use-auth';
 import { Transaction } from '@/types/database';
-import dayjs from 'dayjs';
 
 export function useTransactions(month?: string) {
   const { user } = useAuth();
@@ -27,7 +26,7 @@ export function useTransactions(month?: string) {
 
   // Group transactions by date for SectionList
   const grouped = transactions.reduce<Record<string, Transaction[]>>((acc, t) => {
-    const key = dayjs(t.transaction_date).format('YYYY-MM-DD');
+    const key = t.transaction_date.substring(0, 10);
     if (!acc[key]) acc[key] = [];
     acc[key].push(t);
     return acc;

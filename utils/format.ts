@@ -20,12 +20,18 @@ export function formatCurrency(amount: number, showSign = false): string {
   return formatted;
 }
 
+// Parses date-only strings (YYYY-MM-DD) ignoring timezone to avoid day-shift
+function parseLocalDate(date: string | Date): ReturnType<typeof dayjs> {
+  if (typeof date === 'string') return dayjs(date.substring(0, 10));
+  return dayjs(date);
+}
+
 export function formatDate(date: string | Date, format = 'D [de] MMMM, YYYY'): string {
-  return dayjs(date).format(format);
+  return parseLocalDate(date).format(format);
 }
 
 export function formatShortDate(date: string | Date): string {
-  return dayjs(date).format('DD/MM/YYYY');
+  return parseLocalDate(date).format('DD/MM/YYYY');
 }
 
 export function formatMonth(date: string | Date): string {
@@ -33,7 +39,7 @@ export function formatMonth(date: string | Date): string {
 }
 
 export function formatDayOfWeek(date: string | Date): string {
-  return dayjs(date).format('ddd');
+  return parseLocalDate(date).format('ddd');
 }
 
 export function formatRelativeTime(date: string | Date): string {
@@ -61,5 +67,5 @@ export function getWeekDays(): string[] {
 }
 
 export function toISODate(date: Date | string): string {
-  return dayjs(date).format('YYYY-MM-DD');
+  return parseLocalDate(date).format('YYYY-MM-DD');
 }

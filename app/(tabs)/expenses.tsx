@@ -4,7 +4,7 @@ import isToday from 'dayjs/plugin/isToday';
 import { router } from 'expo-router';
 
 dayjs.extend(isToday);
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -12,6 +12,7 @@ import {
   SectionList,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -54,11 +55,10 @@ function TransactionItem({ item }: { item: Transaction }) {
 }
 
 function SectionHeader({ title }: { title: string }) {
-  const date = dayjs(title);
   const isToday = dayjs().format('YYYY-MM-DD') === title;
   const label = isToday
     ? 'Hoy'
-    : date.format('dddd, D [de] MMMM');
+    : dayjs(title).format('dddd, D [de] MMMM');
 
   return (
     <View style={styles.sectionHeader}>
@@ -68,27 +68,123 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 export default function ExpensesScreen() {
-  const { sections, isLoading, refresh, monthlyTotals } = useTransactions();
+  const [month, setMonth] = useState(dayjs().format('YYYY-MM'));
+  const [query, setQuery] = useState('');
+
+  const { transactions, isLoading, refresh, monthlyTotals } = useTransactions(month);
+
+  const monthLabel = dayjs(month).format('MMMM YYYY');
+  const isCurrentMonth = month === dayjs().format('YYYY-MM');
+
+  function prevMonth() {
+    setQuery('');
+    setMonth((m) => dayjs(m).subtract(1, 'month').format('YYYY-MM'));
+  }
+
+  function nextMonth() {
+    setQuery('');
+    setMonth((m) => dayjs(m).add(1, 'month').format('YYYY-MM'));
+  }
+
+  // Filter by search query
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return transactions;
+    return transactions.filter((t) => {
+      const category = t.category ?? getCategoryById(t.category_id);
+      return (
+        category?.label.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q)
+      );
+    });
+  }, [transactions, query]);
+
+  // Totals based on filtered results
+  const filteredTotals = useMemo(() => {
+    const q = query.trim();
+    if (!q) return monthlyTotals;
+    return filtered.reduce(
+      (acc, t) => ({
+        income: acc.income + (t.type === 'income' ? t.amount : 0),
+        expenses: acc.expenses + (t.type === 'expense' ? t.amount : 0),
+        balance: 0,
+      }),
+      { income: 0, expenses: 0, balance: 0 },
+    );
+  }, [filtered, query, monthlyTotals]);
+
+  // Group into sections
+  const sections = useMemo(() => {
+    const grouped = filtered.reduce<Record<string, Transaction[]>>((acc, t) => {
+      const key = t.transaction_date.substring(0, 10);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(t);
+      return acc;
+    }, {});
+    return Object.entries(grouped)
+      .sort(([a], [b]) => (a > b ? -1 : 1))
+      .map(([date, data]) => ({ title: date, data }));
+  }, [filtered]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Transacciones</Text>
+
+        {/* Month selector */}
+        <View style={styles.monthRow}>
+          <Pressable onPress={prevMonth} style={styles.monthArrow}>
+            <MaterialIcons name="chevron-left" size={24} color={Colors.dark.text} />
+          </Pressable>
+          <Text style={styles.monthLabel}>{monthLabel}</Text>
+          <Pressable
+            onPress={nextMonth}
+            style={[styles.monthArrow, isCurrentMonth && styles.monthArrowDisabled]}
+            disabled={isCurrentMonth}
+          >
+            <MaterialIcons
+              name="chevron-right"
+              size={24}
+              color={isCurrentMonth ? Colors.dark.border : Colors.dark.text}
+            />
+          </Pressable>
+        </View>
+
+        {/* Stats */}
         <View style={styles.headerStats}>
           <View>
             <Text style={styles.statLabel}>Gastos</Text>
             <Text style={[styles.statAmount, { color: Colors.dark.expense }]}>
-              {formatCurrency(monthlyTotals.expenses)}
+              {formatCurrency(filteredTotals.expenses)}
             </Text>
           </View>
           <View style={styles.statDivider} />
           <View>
             <Text style={styles.statLabel}>Ingresos</Text>
             <Text style={[styles.statAmount, { color: Colors.dark.income }]}>
-              {formatCurrency(monthlyTotals.income)}
+              {formatCurrency(filteredTotals.income)}
             </Text>
           </View>
+        </View>
+
+        {/* Search */}
+        <View style={styles.searchRow}>
+          <MaterialIcons name="search" size={18} color={Colors.dark.muted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por categoría o descripción..."
+            placeholderTextColor={Colors.dark.muted}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')}>
+              <MaterialIcons name="close" size={16} color={Colors.dark.muted} />
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -108,14 +204,18 @@ export default function ExpensesScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="receipt-long"
-              title="Sin transacciones"
-              description="Agrega tu primera transacción con el botón + en la barra de navegación"
+              title={query ? 'Sin resultados' : 'Sin transacciones'}
+              description={
+                query
+                  ? `No hay movimientos que coincidan con "${query}"`
+                  : 'Agrega tu primera transacción con el botón + en la barra de navegación'
+              }
             />
           }
           refreshControl={
             <RefreshControl
               refreshing={isLoading}
-              onRefresh={refresh}
+              onRefresh={() => refresh()}
               tintColor={Colors.dark.accent}
             />
           }
@@ -132,13 +232,38 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
+    gap: 12,
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
     color: Colors.dark.text,
-    marginBottom: 16,
+  },
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  monthArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthArrowDisabled: {
+    opacity: 0.3,
+  },
+  monthLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.dark.text,
+    textTransform: 'capitalize',
   },
   headerStats: {
     flexDirection: 'row',
@@ -160,6 +285,23 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: Colors.dark.border,
     marginHorizontal: 8,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.dark.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.dark.text,
+    padding: 0,
   },
   list: {
     paddingHorizontal: 20,

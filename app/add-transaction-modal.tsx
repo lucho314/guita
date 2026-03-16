@@ -16,19 +16,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { CategoryGrid } from '@/components/ui/category-grid';
+import { DatePickerModal } from '@/components/ui/date-picker-modal';
 import { NumericKeypad } from '@/components/ui/numeric-keypad';
 import { Colors } from '@/constants/theme';
 import { useTransactions } from '@/hooks/use-transactions';
 import { TransactionType } from '@/types/database';
 import { getCategoriesByType } from '@/utils/categories';
-import { formatCurrency, toISODate } from '@/utils/format';
+import { formatDate, formatCurrency, toISODate } from '@/utils/format';
 
 export default function AddTransactionModal() {
   const [type, setType] = useState<TransactionType>('expense');
   const [amountStr, setAmountStr] = useState('0');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [description, setDescription] = useState('');
-  const [date] = useState(toISODate(new Date()));
+  const [date, setDate] = useState(toISODate(new Date()));
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { addTransaction } = useTransactions();
@@ -81,8 +83,6 @@ export default function AddTransactionModal() {
       setIsSubmitting(false);
     }
   }
-
-  const displayAmount = parseFloat(amountStr) || 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -153,6 +153,16 @@ export default function AddTransactionModal() {
             />
           </View>
 
+          {/* Date */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Fecha</Text>
+            <Pressable style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
+              <MaterialIcons name="calendar-today" size={18} color={Colors.dark.accent} />
+              <Text style={styles.dateText}>{formatDate(date)}</Text>
+              <MaterialIcons name="chevron-right" size={20} color={Colors.dark.muted} />
+            </Pressable>
+          </View>
+
           {/* Note */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Nota (opcional)</Text>
@@ -178,6 +188,13 @@ export default function AddTransactionModal() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <DatePickerModal
+        visible={showDatePicker}
+        value={date}
+        onConfirm={(d) => { setDate(d); setShowDatePicker(false); }}
+        onClose={() => setShowDatePicker(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -268,6 +285,23 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.dark.border,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  dateText: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.dark.text,
+    fontWeight: '500',
   },
   noteInput: {
     backgroundColor: Colors.dark.surface,

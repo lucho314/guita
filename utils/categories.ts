@@ -18,6 +18,7 @@ export const CATEGORIES: Category[] = [
   { id: 'inversiones', label: 'Inversiones', icon: 'trending-up', color: '#F59E0B', type: 'income' },
   { id: 'regalo', label: 'Regalo', icon: 'card-giftcard', color: '#EC4899', type: 'income' },
   { id: 'otros_ingreso', label: 'Otros', icon: 'attach-money', color: '#6B7280', type: 'income' },
+  { id: 'deporte', label: 'Deporte', icon: 'fitness-center', color: '#10B981', type: 'expense' },
   { id: 'otros_gasto', label: 'Otros', icon: 'more-horiz', color: '#6B7280', type: 'expense' },
 ];
 
