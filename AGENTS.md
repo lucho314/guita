@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Architecture
 
@@ -37,15 +37,3 @@ Colors are defined in `constants/theme.ts` (exports `Colors` for light/dark and 
 - React Compiler enabled (`experiments.reactCompiler: true`)
 - Typed routes enabled (`experiments.typedRoutes: true`)
 - Deep link scheme: `finanzasapp`
-
-## Android Build (USB)
-
-```bash
-# 1. Redirigir el puerto de Metro al dispositivo
-adb reverse tcp:8081 tcp:8081
-
-# 2. Compilar y correr (usa el JDK de Android Studio para evitar incompatibilidad con JDK 25)
-JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" PATH="/c/Program Files/Android/Android Studio/jbr/bin:$PATH" npx expo run:android
-```
-
-> Si la app abre en negro, forzar cierre y relanzar después de que Metro esté corriendo.

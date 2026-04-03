@@ -3,19 +3,15 @@ import { supabase } from './supabase';
 import { Transaction, MonthlyTotals, WeeklySpending } from '@/types/database';
 
 export async function fetchTransactions(userId: string, month?: string): Promise<Transaction[]> {
-  const startOf = dayjs(month || undefined)
-    .startOf('month')
-    .toISOString();
-  const endOf = dayjs(month || undefined)
-    .endOf('month')
-    .toISOString();
+  const startOf = dayjs(month || undefined).startOf('month').format('YYYY-MM-DD');
+  const endOf = dayjs(month || undefined).endOf('month').add(1, 'day').format('YYYY-MM-DD');
 
   const { data, error } = await supabase
     .from('transactions')
     .select('*, category:categories(*)')
     .eq('user_id', userId)
     .gte('transaction_date', startOf)
-    .lte('transaction_date', endOf)
+    .lt('transaction_date', endOf)
     .order('transaction_date', { ascending: false });
 
   if (error) throw error;
@@ -86,8 +82,8 @@ export async function getWeeklySpending(userId: string): Promise<WeeklySpending[
 
   for (let i = 6; i >= 0; i--) {
     const date = dayjs().subtract(i, 'day');
-    const start = date.startOf('day').toISOString();
-    const end = date.endOf('day').toISOString();
+    const start = date.format('YYYY-MM-DD');
+    const end = date.add(1, 'day').format('YYYY-MM-DD');
 
     const { data } = await supabase
       .from('transactions')
@@ -95,7 +91,7 @@ export async function getWeeklySpending(userId: string): Promise<WeeklySpending[
       .eq('user_id', userId)
       .eq('type', 'expense')
       .gte('transaction_date', start)
-      .lte('transaction_date', end);
+      .lt('transaction_date', end);
 
     const amount = (data ?? []).reduce((sum: number, t: { amount: number }) => sum + t.amount, 0);
     days.push({ day: date.format('ddd'), amount });

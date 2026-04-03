@@ -87,7 +87,12 @@ export default function TransactionDetailScreen() {
           <MaterialIcons name="arrow-back" size={24} color={Colors.dark.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Detalle</Text>
-        <View style={{ width: 40 }} />
+        <Pressable
+          onPress={() => router.push({ pathname: '/edit-transaction-modal', params: { id: transaction.id } })}
+          style={styles.backBtn}
+        >
+          <MaterialIcons name="edit" size={20} color={Colors.dark.text} />
+        </Pressable>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>

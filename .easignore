@@ -1,0 +1,9 @@
+.git
+.expo
+node_modules
+dist
+.agents
+.claude
+skills-lock.json
+AGENTS.md
+CLAUDE.md

@@ -300,7 +300,8 @@ values
   ('inversiones', 'Inversiones', 'trending-up', '#F59E0B', 'income'),
   ('regalo', 'Regalo', 'card-giftcard', '#EC4899', 'income'),
   ('otros_ingreso', 'Otros', 'attach-money', '#6B7280', 'income'),
-  ('otros_gasto', 'Otros', 'more-horiz', '#6B7280', 'expense')
+  ('otros_gasto', 'Otros', 'more-horiz', '#6B7280', 'expense'),
+  ('deporte', 'Deporte', 'fitness-center', '#10B981', 'expense')
 on conflict (id) do update
 set
   label = excluded.label,
